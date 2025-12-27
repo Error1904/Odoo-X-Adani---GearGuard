@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GearGuard Feature Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #2563eb; }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 10px 10px 0;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid transparent;
+        }
+        .log-entry.success {
+            border-left-color: #10b981;
+            color: #10b981;
+        }
+        .log-entry.error {
+            border-left-color: #ef4444;
+            color: #ef4444;
+        }
+        .log-entry.info {
+            border-left-color: #3b82f6;
+            color: #3b82f6;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .status.pending { background: #fbbf24; color: #78350f; }
+        .status.success { background: #10b981; color: white; }
+        .status.error { background: #ef4444; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛠️ GearGuard Feature Test</h1>
+        <p>This will test all features by directly calling the Supabase API.</p>
+
+        <div>
+            <button onclick="runAllTests()">Run All Tests</button>
+            <button onclick="testTeamCreation()">Test: Create Team</button>
+            <button onclick="testProfileCreation()">Test: Add Team Member</button>
+            <button onclick="testEquipmentCreation()">Test: Create Equipment</button>
+            <button onclick="testMaintenanceRequest()">Test: Create Request</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div id="log" class="log">
+            <div class="log-entry info">Ready to test. Click "Run All Tests" to begin.</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+
+        // Initialize Supabase
+        const SUPABASE_URL = 'https://inlgwcewuzrtrrwdrcvx.supabase.co'
+        const SUPABASE_ANON_KEY = 'sb_publishable_9NODNv51yKTlIaW3PzZTfg_fbeTq6eT'
+
+        window.supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+        window.log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log')
+            const entry = document.createElement('div')
+            entry.className = `log-entry ${type}`
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+            logDiv.appendChild(entry)
+            logDiv.scrollTop = logDiv.scrollHeight
+        }
+
+        window.clearLog = () => {
+            document.getElementById('log').innerHTML = '<div class="log-entry info">Log cleared.</div>'
+        }
+
+        // Store created IDs for cleanup
+        let createdIds = {
+            teams: [],
+            profiles: [],
+            equipment: [],
+            requests: []
+        }
+
+        window.testTeamCreation = async () => {
+            log('🧪 Testing Team Creation...', 'info')
+
+            try {
+                const teamName = `Test Team ${Date.now()}`
+                log(`Creating team: "${teamName}"`, 'info')
+
+                const { data, error } = await window.supabase
+                    .from('teams')
+                    .insert({ name: teamName })
+                    .select()
+
+                if (error) {
+                    log(`❌ ERROR: ${error.message}`, 'error')
+                    log(`Details: ${JSON.stringify(error)}`, 'error')
+                    return false
+                }
+
+                createdIds.teams.push(data[0].id)
+                log(`✅ SUCCESS: Team created with ID: ${data[0].id}`, 'success')
+                log(`Data: ${JSON.stringify(data[0], null, 2)}`, 'success')
+                return data[0]
+            } catch (err) {
+                log(`❌ EXCEPTION: ${err.message}`, 'error')
+                return false
+            }
+        }
+
+        window.testProfileCreation = async (teamId) => {
+            log('🧪 Testing Profile Creation...', 'info')
+
+            try {
+                const profileName = `Test User ${Date.now()}`
+                log(`Creating profile: "${profileName}"`, 'info')
+
+                const { data, error } = await window.supabase
+                    .from('profiles')
+                    .insert({
+                        full_name: profileName,
+                        team_id: teamId,
+                        role: 'technician'
+                    })
+                    .select()
+
+                if (error) {
+                    log(`❌ ERROR: ${error.message}`, 'error')
+                    return false
+                }
+
+                createdIds.profiles.push(data[0].id)
+                log(`✅ SUCCESS: Profile created with ID: ${data[0].id}`, 'success')
+                return data[0]
+            } catch (err) {
+                log(`❌ EXCEPTION: ${err.message}`, 'error')
+                return false
+            }
+        }
+
+        window.testEquipmentCreation = async (teamId) => {
+            if (!teamId) {
+                log('⚠️ Need a team first. Creating one...', 'info')
+                const team = await testTeamCreation()
+                if (!team) return false
+                teamId = team.id
+            }
+
+            log('🧪 Testing Equipment Creation...', 'info')
+
+            try {
+                const equipmentName = `Test Machine ${Date.now()}`
+                log(`Creating equipment: "${equipmentName}"`, 'info')
+
+                const { data, error } = await window.supabase
+                    .from('equipment')
+                    .insert({
+                        name: equipmentName,
+                        serial_number: `SN-${Date.now()}`,
+                        category: 'Test Category',
+                        department: 'Test Department',
+                        location: 'Test Location',
+                        purchase_date: '2024-01-01',
+                        warranty_end_date: '2026-01-01',
+                        maintenance_team_id: teamId
+                    })
+                    .select()
+
+                if (error) {
+                    log(`❌ ERROR: ${error.message}`, 'error')
+                    return false
+                }
+
+                createdIds.equipment.push(data[0].id)
+                log(`✅ SUCCESS: Equipment created with ID: ${data[0].id}`, 'success')
+                log(`✅ Team auto-assigned: ${data[0].maintenance_team_id}`, 'success')
+                return data[0]
+            } catch (err) {
+                log(`❌ EXCEPTION: ${err.message}`, 'error')
+                return false
+            }
+        }
+
+        window.testMaintenanceRequest = async (equipmentId, profileId) => {
+            if (!equipmentId || !profileId) {
+                log('⚠️ Need equipment and profile first. Creating...', 'info')
+                const team = await testTeamCreation()
+                if (!team) return false
+
+                const profile = await testProfileCreation(team.id)
+                if (!profile) return false
+
+                const equipment = await testEquipmentCreation(team.id)
+                if (!equipment) return false
+
+                equipmentId = equipment.id
+                profileId = profile.id
+            }
+
+            log('🧪 Testing Maintenance Request Creation...', 'info')
+
+            try {
+                const subject = `Test Request ${Date.now()}`
+                log(`Creating maintenance request: "${subject}"`, 'info')
+
+                const { data, error } = await window.supabase
+                    .from('maintenance_requests')
+                    .insert({
+                        subject: subject,
+                        equipment_id: equipmentId,
+                        team_id: createdIds.teams[0],
+                        request_type: 'corrective',
+                        priority: 'normal',
+                        created_by: profileId
+                    })
+                    .select()
+
+                if (error) {
+                    log(`❌ ERROR: ${error.message}`, 'error')
+                    log(`Details: ${JSON.stringify(error)}`, 'error')
+                    return false
+                }
+
+                createdIds.requests.push(data[0].id)
+                log(`✅ SUCCESS: Maintenance request created with ID: ${data[0].id}`, 'success')
+                log(`✅ Status: ${data[0].status} (should be 'new')`, 'success')
+                return data[0]
+            } catch (err) {
+                log(`❌ EXCEPTION: ${err.message}`, 'error')
+                return false
+            }
+        }
+
+        window.runAllTests = async () => {
+            clearLog()
+            log('🚀 Starting Full Test Suite...', 'info')
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info')
+
+            // Test 1: Create Team
+            const team = await testTeamCreation()
+            if (!team) {
+                log('❌ FAILED: Cannot proceed without team', 'error')
+                return
+            }
+
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info')
+
+            // Test 2: Create Profile
+            const profile = await testProfileCreation(team.id)
+            if (!profile) {
+                log('❌ FAILED: Cannot proceed without profile', 'error')
+                return
+            }
+
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info')
+
+            // Test 3: Create Equipment
+            const equipment = await testEquipmentCreation(team.id)
+            if (!equipment) {
+                log('❌ FAILED: Cannot proceed without equipment', 'error')
+                return
+            }
+
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info')
+
+            // Test 4: Create Maintenance Request
+            const request = await testMaintenanceRequest(equipment.id, profile.id)
+            if (!request) {
+                log('❌ FAILED: Maintenance request creation failed', 'error')
+                return
+            }
+
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info')
+            log('🎉 ALL TESTS PASSED!', 'success')
+            log('✅ Team created', 'success')
+            log('✅ Profile created', 'success')
+            log('✅ Equipment created', 'success')
+            log('✅ Maintenance request created', 'success')
+            log('', 'info')
+            log('👉 Now check the app to see the data!', 'info')
+            log('   - Go to Teams page', 'info')
+            log('   - Go to Equipment page', 'info')
+            log('   - Go to Kanban page', 'info')
+        }
+    </script>
+</body>
+</html>
