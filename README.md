@@ -201,3 +201,5 @@ For issues and questions, please open an issue on GitHub.
 ## Deployed on Vercel
 
 https://gearguard-eosin.vercel.app/
+
+For deployment steps, see [DEPLOYMENT.md](DEPLOYMENT.md).
